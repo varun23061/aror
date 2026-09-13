@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Aror | Admin</title>
+<style>
+:root{--bg:#fbf6ef;--paper:#fffdf9;--ink:#292421;--muted:#766e67;--rose:#d88986;--rose2:#f2d6d0;--line:#e8ded5;--brown:#6b4d42}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Manrope,Arial,sans-serif}
+button,input,textarea,select{font:inherit}
+a{color:inherit;text-decoration:none}
+header{padding:22px 6%;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:var(--paper)}
+header b{font-size:15px;letter-spacing:2px}
+header small{display:block;font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-top:2px}
+.logout{border:1px solid var(--ink);background:none;padding:9px 16px;font-size:11px;font-weight:800;cursor:pointer}
+#loginWrap{min-height:calc(100vh - 90px);display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{width:100%;max-width:360px;background:var(--paper);border:1px solid var(--line);padding:34px 30px;text-align:center}
+.login-box h1{font-size:26px;margin:0 0 6px;font-weight:800}
+.login-box p{color:var(--muted);font-size:12px;margin:0 0 22px}
+.field{width:100%;padding:12px;border:1px solid var(--line);background:#fff;margin:6px 0 14px;font-size:13px}
+.btn{display:inline-block;border:0;padding:13px 20px;cursor:pointer;font-size:11px;font-weight:800;width:100%}
+.dark{background:var(--ink);color:#fff}
+.err{background:#fbdede;color:#7a2020;padding:10px;font-size:11px;margin-bottom:12px;display:none}
+#dash{display:none;padding:35px 6% 70px;max-width:1300px;margin:auto}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px}
+.tab{border:1px solid var(--line);background:#fff;padding:10px 18px;font-size:11px;font-weight:800;cursor:pointer;border-radius:99px}
+.tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.panel{background:var(--paper);border:1px solid var(--line);padding:26px;margin-bottom:22px}
+.panel h2{font-size:19px;margin:0 0 4px}
+.panel .sub{color:var(--muted);font-size:11px;margin:0 0 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+label{display:block;font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--muted);margin:14px 0 4px}
+label:first-child{margin-top:0}
+.notice{padding:13px;background:var(--rose2);margin-bottom:18px;font-size:11.5px}
+.prow{display:grid;grid-template-columns:70px 1fr auto auto;gap:14px;align-items:center;border-bottom:1px solid var(--line);padding:14px 0}
+.thumb{width:70px;height:70px;object-fit:cover;background:#eee3d8}
+.smallbtn{border:1px solid var(--ink);background:none;padding:9px 14px;font-size:10px;font-weight:800;cursor:pointer}
+.smallbtn.del{border-color:#a33;color:#a33}
+.imgprev{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.imgprev img{width:56px;height:56px;object-fit:cover;border:1px solid var(--line)}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div><b>THE AROR</b><small>ADMIN CONSOLE</small></div>
+  <div style="display:flex;gap:10px">
+    <a href="main_aror.html" target="_blank" class="logout" id="viewSiteBtn" style="display:none">View Customer Website ↗</a>
+    <button class="logout" id="logoutBtn" style="display:none" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<div id="loginWrap">
+  <div class="login-box">
+    <h1>Admin Login</h1>
+    <p>Enter your admin ID and password to manage the store.</p>
+    <div class="err" id="loginErr">Incorrect ID or password.</div>
+    <input class="field" id="loginId" placeholder="Admin ID" autocomplete="username">
+    <input class="field" id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn dark" onclick="tryLogin()">Log in</button>
+  </div>
+</div>
+
+<div id="dash">
+  <div class="tabs">
+    <button class="tab" data-t="orders" onclick="showTab('orders')">Orders <span id="orderBadge" style="background:#a33;color:#fff;border-radius:99px;padding:2px 8px;font-size:9px;margin-left:4px"></span></button>
+    <button class="tab" data-t="customers" onclick="showTab('customers')">Customers</button>
+    <button class="tab" data-t="content" onclick="showTab('content')">Website Content</button>
+    <button class="tab" data-t="products" onclick="showTab('products')">Products</button>
+    <button class="tab" data-t="payment" onclick="showTab('payment')">Payment Settings</button>
+    <button class="tab" data-t="account" onclick="showTab('account')">Admin Account</button>
+  </div>
+  <div id="tabBody"></div>
+</div>
+
+<script>
+const KEY='aror_store_v1';
+const AUTH_KEY='aror_admin_auth_v1';
+const SESSION_KEY='aror_admin_session';
+
+/* ---------- store shared with the customer site ---------- */
+function store(){
+  let s=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(!s){ s={products:[],cart:[],upi:'',qr:'',content:{},orders:[]}; }
+  if(!s.content) s.content={};
+  if(!s.products) s.products=[];
+  if(!s.orders) s.orders=[];
+  if(!s.customers) s.customers=[];
+  if(!s.emailjs) s.emailjs={service:'',template:'',key:''};
+  s.products.forEach(p=>{ if(!Array.isArray(p.gallery)) p.gallery=[]; });
+  return s;
+}
+function save(s){ localStorage.setItem(KEY,JSON.stringify(s)); }
+function money(n){ return '₹'+Number(n||0).toLocaleString('en-IN'); }
+
+/* ---------- single admin account (ID + password) ---------- */
+function auth(){
+  let a=JSON.parse(localStorage.getItem(AUTH_KEY)||'null');
+  if(!a){ a={id:'admin',pass:'aror2026'}; localStorage.setItem(AUTH_KEY,JSON.stringify(a)); }
+  return a;
+}
+function isLoggedIn(){ return sessionStorage.getItem(SESSION_KEY)==='1'; }
+function tryLogin(){
+  let a=auth();
+  let id=document.getElementById('loginId').value.trim();
+  let pass=document.getElementById('loginPass').value;
+  if(id===a.id && pass===a.pass){
+    sessionStorage.setItem(SESSION_KEY,'1');
+    boot();
+  }else{
+    document.getElementById('loginErr').style.display='block';
+  }
+}
+function logout(){
+  sessionStorage.removeItem(SESSION_KEY);
+  boot();
+}
+function boot(){
+  if(isLoggedIn()){
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('dash').style.display='block';
+    document.getElementById('logoutBtn').style.display='inline-block';
+    document.getElementById('viewSiteBtn').style.display='inline-block';
+    showTab('orders');
+  }else{
+    document.getElementById('loginWrap').style.display='flex';
+    document.getElementById('dash').style.display='none';
+    document.getElementById('logoutBtn').style.display='none';
+    document.getElementById('viewSiteBtn').style.display='none';
+    document.getElementById('loginErr').style.display='none';
+    document.getElementById('loginId').value='';
+    document.getElementById('loginPass').value='';
+  }
+}
+
+/* ---------- helpers ---------- */
+function readFile(input){
+  return new Promise(res=>{
+    let f=input.files[0];
+    if(!f) return res('');
+    let fr=new FileReader();
+    fr.onload=()=>res(fr.result);
+    fr.readAsDataURL(f);
+  });
+}
+function readFiles(input){
+  return Promise.all([...input.files].map(f=>new Promise(res=>{
+    let fr=new FileReader();
+    fr.onload=()=>res(fr.result);
+    fr.readAsDataURL(f);
+  })));
+}
+function toast(t){
+  let d=document.createElement('div');
+  d.textContent=t;
+  d.style='position:fixed;right:20px;bottom:20px;background:#292421;color:#fff;padding:14px 18px;z-index:50;font-size:12px';
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),1600);
+}
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  if(t==='orders') renderOrdersTab();
+  else if(t==='customers') renderCustomersTab();
+  else if(t==='content') renderContentTab();
+  else if(t==='products') renderProductsTab();
+  else if(t==='payment') renderPaymentTab();
+  else renderAccountTab();
+  updateOrderBadge();
+}
+
+/* ---------- Customers tab ---------- */
+function renderCustomersTab(){
+  let customers=store().customers||[];
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>Registered Customers (${customers.length})</h2>
+      <p class="sub">Everyone who creates a login on the website shows up here.</p>
+      <div class="notice">Passwords are stored and shown here in plain text, which is fine for a small demo store but not safe for a real, public store — anyone with access to this admin page (or the browser's storage) can read every customer's password.</div>
+      ${customers.length?`
+      <div style="overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tr style="text-align:left;border-bottom:1px solid var(--line)">
+          <th style="padding:8px 6px">Name</th>
+          <th style="padding:8px 6px">Customer ID</th>
+          <th style="padding:8px 6px">Password</th>
+          <th style="padding:8px 6px">Phone</th>
+          <th style="padding:8px 6px">Email</th>
+          <th style="padding:8px 6px">Joined</th>
+          <th style="padding:8px 6px"></th>
+        </tr>
+        ${customers.map(c=>{
+          let d=new Date(c.date);
+          let dateStr=isNaN(d)?'':d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+          return `<tr style="border-bottom:1px solid var(--line)">
+            <td style="padding:8px 6px">${esc(c.name)}</td>
+            <td style="padding:8px 6px">${esc(c.custId)}</td>
+            <td style="padding:8px 6px">${esc(c.pass)}</td>
+            <td style="padding:8px 6px">${esc(c.phone)}</td>
+            <td style="padding:8px 6px">${esc(c.email)}</td>
+            <td style="padding:8px 6px">${dateStr}</td>
+            <td style="padding:8px 6px"><button class="smallbtn del" onclick="delCustomer(${c.id})">Delete</button></td>
+          </tr>`;
+        }).join('')}
+      </table></div>`:'<p class="sub">No customers have signed up yet.</p>'}
+    </div>
+  `;
+}
+function delCustomer(id){
+  if(!confirm('Delete this customer account? They will need to sign up again to order.')) return;
+  let s=store();
+  s.customers=(s.customers||[]).filter(c=>c.id!==id);
+  save(s); renderCustomersTab();
+}
+function updateOrderBadge(){
+  let n=store().orders.filter(o=>o.status==='New').length;
+  document.getElementById('orderBadge').textContent=n>0?n:'';
+}
+
+/* ---------- Orders tab ---------- */
+function renderOrdersTab(){
+  let orders=store().orders||[];
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>Customer Orders (${orders.length})</h2>
+      <p class="sub">Every order a customer places at checkout appears here, newest first.</p>
+      ${orders.length?orders.map(o=>orderCard(o)).join(''):'<p class="sub">No orders yet.</p>'}
+    </div>
+  `;
+}
+function orderCard(o){
+  let d=new Date(o.date);
+  let dateStr=isNaN(d)?'':d.toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  let itemsHtml=(o.items||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0"><span>${i.name} × ${i.qty}</span><span>${money(i.price*i.qty)}</span></div>`).join('');
+  let statusColor=o.status==='New'?'#a33':o.status==='Processing'?'#a67c1f':'#2e7d32';
+  return `
+    <div class="panel" style="margin-bottom:14px;border-left:4px solid ${statusColor}">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <b>${esc(o.name)}</b> <span style="color:var(--muted);font-size:11px">• ${esc(o.phone)}</span>
+          <div style="color:var(--muted);font-size:11px;margin-top:2px">${dateStr}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:800">${money(o.total)}</div>
+          <div style="font-size:10px;color:var(--muted)">${o.method==='cod'?'Cash on Delivery':'UPI / QR'}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:12px"><b>Delivery address:</b> ${esc(o.address)}</div>
+      <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${itemsHtml}</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">
+        <label style="margin:0;font-size:10px">Status:</label>
+        <select class="field" style="width:auto;margin:0;padding:8px 10px" onchange="setOrderStatus(${o.id},this.value)">
+          <option value="New" ${o.status==='New'?'selected':''}>New</option>
+          <option value="Processing" ${o.status==='Processing'?'selected':''}>Processing</option>
+          <option value="Completed" ${o.status==='Completed'?'selected':''}>Completed</option>
+        </select>
+        <button class="smallbtn del" onclick="delOrder(${o.id})">Delete</button>
+      </div>
+    </div>
+  `;
+}
+function setOrderStatus(id,status){
+  let s=store();
+  let o=s.orders.find(x=>x.id===id);
+  if(o){ o.status=status; save(s); updateOrderBadge(); }
+}
+function delOrder(id){
+  if(!confirm('Delete this order record?')) return;
+  let s=store();
+  s.orders=s.orders.filter(o=>o.id!==id);
+  save(s); renderOrdersTab(); updateOrderBadge();
+}
+
+/* ---------- Website Content tab ---------- */
+function renderContentTab(){
+  let c=store().content||{};
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>Homepage Hero</h2>
+      <p class="sub">Edit the main headline, text and the main image shown on the homepage.</p>
+      <div class="grid2">
+        <div>
+          <label>Eyebrow line</label>
+          <input class="field" id="c_heroEyebrow" value="${esc(c.heroEyebrow)}" placeholder="THE AROR • THREAD & HAND MADE">
+          <label>Headline (HTML allowed, e.g. use &lt;br&gt;)</label>
+          <textarea class="field" id="c_heroTitle" rows="2" placeholder="Little loops,<br><i>big feelings.</i>">${esc(c.heroTitle)}</textarea>
+          <label>Description text</label>
+          <textarea class="field" id="c_heroText" rows="4" placeholder="Discover soft, everlasting crochet gifts...">${esc(c.heroText)}</textarea>
+        </div>
+        <div>
+          <label>Hero / front advertisement image</label>
+          <input class="field" type="file" accept="image/*" id="c_heroImgFile">
+          ${c.heroImg?`<div class="imgprev"><img src="${c.heroImg}"></div>`:''}
+        </div>
+      </div>
+      <button class="smallbtn" style="margin-top:10px" onclick="saveHero()">Save homepage hero</button>
+    </div>
+
+    <div class="panel">
+      <h2>Feature Banner</h2>
+      <p class="sub">The dark promotional banner shown below the featured products.</p>
+      <div class="grid2">
+        <div>
+          <label>Banner headline (HTML allowed)</label>
+          <textarea class="field" id="c_bannerTitle" rows="2" placeholder="A little gift can<br>hold a lot of love.">${esc(c.bannerTitle)}</textarea>
+          <label>Banner text</label>
+          <textarea class="field" id="c_bannerText" rows="4" placeholder="Every The Aror piece is designed...">${esc(c.bannerText)}</textarea>
+        </div>
+        <div>
+          <label>Banner advertisement image</label>
+          <input class="field" type="file" accept="image/*" id="c_bannerImgFile">
+          ${c.bannerImg?`<div class="imgprev"><img src="${c.bannerImg}"></div>`:''}
+        </div>
+      </div>
+      <button class="smallbtn" style="margin-top:10px" onclick="saveBanner()">Save banner</button>
+    </div>
+
+    <div class="panel">
+      <h2>Our Story (About page)</h2>
+      <label>Page title (HTML allowed)</label>
+      <input class="field" id="c_aboutTitle" value="${esc(c.aboutTitle)}" placeholder="Made slowly.<br>Made lovingly.">
+      <label>Story text</label>
+      <textarea class="field" id="c_aboutText" rows="4" placeholder="The Aror creates handmade crochet gifts...">${esc(c.aboutText)}</textarea>
+      <button class="smallbtn" onclick="saveAbout()">Save story</button>
+    </div>
+
+    <div class="panel">
+      <h2>Contact Page</h2>
+      <label>Page title (HTML allowed)</label>
+      <input class="field" id="c_contactTitle" value="${esc(c.contactTitle)}" placeholder="Let's create<br>something lovely.">
+      <label>Intro text (optional)</label>
+      <textarea class="field" id="c_contactText" rows="3" placeholder="Optional note shown above the contact form">${esc(c.contactText)}</textarea>
+      <button class="smallbtn" onclick="saveContact()">Save contact page</button>
+    </div>
+
+    <div class="panel">
+      <h2>Site Logo</h2>
+      <p class="sub">Replace the logo shown in the header and footer of the customer site.</p>
+      <input class="field" type="file" accept="image/*" id="c_logoFile">
+      ${c.logoImg?`<div class="imgprev"><img src="${c.logoImg}"></div>`:''}
+      <button class="smallbtn" onclick="saveLogo()">Save logo</button>
+    </div>
+  `;
+}
+function esc(v){ return (v||'').replace(/"/g,'&quot;'); }
+
+async function saveHero(){
+  let s=store();
+  s.content.heroEyebrow=document.getElementById('c_heroEyebrow').value.trim();
+  s.content.heroTitle=document.getElementById('c_heroTitle').value.trim();
+  s.content.heroText=document.getElementById('c_heroText').value.trim();
+  let img=await readFile(document.getElementById('c_heroImgFile'));
+  if(img) s.content.heroImg=img;
+  save(s); toast('Homepage hero saved ♡'); renderContentTab();
+}
+async function saveBanner(){
+  let s=store();
+  s.content.bannerTitle=document.getElementById('c_bannerTitle').value.trim();
+  s.content.bannerText=document.getElementById('c_bannerText').value.trim();
+  let img=await readFile(document.getElementById('c_bannerImgFile'));
+  if(img) s.content.bannerImg=img;
+  save(s); toast('Banner saved ♡'); renderContentTab();
+}
+function saveAbout(){
+  let s=store();
+  s.content.aboutTitle=document.getElementById('c_aboutTitle').value.trim();
+  s.content.aboutText=document.getElementById('c_aboutText').value.trim();
+  save(s); toast('Story page saved ♡'); renderContentTab();
+}
+function saveContact(){
+  let s=store();
+  s.content.contactTitle=document.getElementById('c_contactTitle').value.trim();
+  s.content.contactText=document.getElementById('c_contactText').value.trim();
+  save(s); toast('Contact page saved ♡'); renderContentTab();
+}
+async function saveLogo(){
+  let s=store();
+  let img=await readFile(document.getElementById('c_logoFile'));
+  if(img){ s.content.logoImg=img; save(s); toast('Logo saved ♡'); renderContentTab(); }
+  else toast('Choose an image first');
+}
+
+/* ---------- Products tab ---------- */
+let editingId=null;
+function renderProductsTab(){
+  let s=store();
+  let p=editingId?s.products.find(x=>x.id===editingId):null;
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>${p?'Edit product':'Add new product'}</h2>
+      <p class="sub">${p?'Update the details below, then save.':'Fill in the details and add a new product to the shop.'}</p>
+      <div class="grid2">
+        <div>
+          <label>Product name</label>
+          <input class="field" id="pn" value="${esc(p?.name)}" placeholder="Crochet Rose Bouquet">
+          <label>Price (₹)</label>
+          <input class="field" id="pp" type="number" value="${p?p.price:''}" placeholder="799">
+          <label>Category</label>
+          <input class="field" id="pc" value="${esc(p?.cat)}" placeholder="Bouquets">
+          <label>Description</label>
+          <textarea class="field" id="pd" rows="3" placeholder="Short product description">${esc(p?.desc)}</textarea>
+          <label>Fallback emoji (used if no image)</label>
+          <input class="field" id="pe" value="${esc(p?.emoji)}" placeholder="🌹">
+        </div>
+        <div>
+          <label>Main product image</label>
+          <input class="field" type="file" accept="image/*" id="pi">
+          ${p?.img?`<div class="imgprev"><img src="${p.img}"></div>`:''}
+          <label>Extra gallery images (front-side advertisement / multiple angles)</label>
+          <input class="field" type="file" accept="image/*" multiple id="pg">
+          ${p?.gallery?.length?`<div class="imgprev">${p.gallery.map(g=>`<img src="${g}">`).join('')}</div>`:''}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="smallbtn" onclick="saveProduct()">${p?'Save changes':'Add product'}</button>
+        ${p?`<button class="smallbtn del" onclick="cancelEdit()">Cancel edit</button>`:''}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>All products (${s.products.length})</h2>
+      ${s.products.map(x=>`
+        <div class="prow">
+          ${x.img?`<img class="thumb" src="${x.img}">`:`<div class="thumb" style="display:flex;align-items:center;justify-content:center;font-size:26px">${x.emoji||'♡'}</div>`}
+          <div><b>${x.name}</b><br><small style="color:var(--muted)">${x.cat} • ${money(x.price)}</small></div>
+          <button class="smallbtn" onclick="editProduct(${x.id})">Edit</button>
+          <button class="smallbtn del" onclick="delProduct(${x.id})">Delete</button>
+        </div>`).join('')||'<p class="sub">No products yet.</p>'}
+    </div>
+  `;
+}
+function editProduct(id){ editingId=id; renderProductsTab(); }
+function cancelEdit(){ editingId=null; renderProductsTab(); }
+async function saveProduct(){
+  let n=document.getElementById('pn').value.trim();
+  let price=+document.getElementById('pp').value;
+  let cat=document.getElementById('pc').value.trim()||'Gifts';
+  let desc=document.getElementById('pd').value.trim();
+  let emoji=document.getElementById('pe').value.trim();
+  if(!n||!price){ toast('Enter product name and price'); return; }
+  let img=await readFile(document.getElementById('pi'));
+  let newGallery=await readFiles(document.getElementById('pg'));
+  let s=store();
+  if(editingId){
+    let p=s.products.find(x=>x.id===editingId);
+    p.name=n; p.price=price; p.cat=cat; p.desc=desc; p.emoji=emoji;
+    if(img) p.img=img;
+    if(newGallery.length) p.gallery=[...(p.gallery||[]),...newGallery];
+    save(s); toast('Product updated ♡'); editingId=null;
+  }else{
+    s.products.unshift({id:Date.now(),name:n,price,cat,desc,emoji,img,gallery:newGallery});
+    save(s); toast('Product added ♡');
+  }
+  renderProductsTab();
+}
+function delProduct(id){
+  if(!confirm('Delete this product?')) return;
+  let s=store();
+  s.products=s.products.filter(p=>p.id!==id);
+  s.cart=s.cart.filter(i=>i.id!==id);
+  save(s);
+  if(editingId===id) editingId=null;
+  renderProductsTab();
+}
+
+/* ---------- Payment tab ---------- */
+function renderPaymentTab(){
+  let s=store();
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>Payment Settings</h2>
+      <p class="sub">Shown to customers at checkout.</p>
+      <label>UPI ID</label>
+      <input class="field" id="pu" value="${esc(s.upi)}" placeholder="yourname@upi">
+      <label>QR code image</label>
+      <input class="field" type="file" accept="image/*" id="pqr">
+      ${s.qr?`<div class="imgprev"><img src="${s.qr}"></div>`:''}
+      <button class="smallbtn" onclick="savePayment()">Save payment settings</button>
+    </div>
+  `;
+}
+async function savePayment(){
+  let s=store();
+  s.upi=document.getElementById('pu').value.trim();
+  let q=await readFile(document.getElementById('pqr'));
+  if(q) s.qr=q;
+  save(s); toast('Payment settings saved ♡'); renderPaymentTab();
+}
+
+/* ---------- Account tab (change the single admin ID / password) ---------- */
+function renderAccountTab(){
+  let a=auth();
+  let ej=store().emailjs||{service:'',template:'',key:''};
+  document.getElementById('tabBody').innerHTML=`
+    <div class="panel">
+      <h2>Admin Account</h2>
+      <p class="sub">Only one admin account exists for this store. Change the ID and password here.</p>
+      <div class="notice">Keep this ID and password private — anyone who has them can edit your store.</div>
+      <label>Current password</label>
+      <input class="field" type="password" id="curPass">
+      <label>New admin ID</label>
+      <input class="field" id="newId" value="${esc(a.id)}">
+      <label>New password</label>
+      <input class="field" type="password" id="newPass" placeholder="Leave blank to keep current password">
+      <button class="smallbtn" onclick="changeAccount()">Save account changes</button>
+    </div>
+
+    <div class="panel">
+      <h2>Email Notifications (EmailJS)</h2>
+      <p class="sub">When a customer signs up, their Customer ID and password can be emailed to them automatically using a free <a href="https://www.emailjs.com/" target="_blank" style="text-decoration:underline">EmailJS</a> account — no backend server required.</p>
+      <div class="notice">
+        1) Create a free account at emailjs.com and connect your email (Gmail, Outlook, etc).<br>
+        2) Create an Email Template with these variables in it: <code>{{to_email}}</code>, <code>{{to_name}}</code>, <code>{{customer_id}}</code>, <code>{{password}}</code>.<br>
+        3) Copy your Service ID, Template ID and Public Key below and save. Leave any field blank to turn this off (customers will still see their details on screen).
+      </div>
+      <label>Service ID</label>
+      <input class="field" id="ej_service" value="${esc(ej.service)}" placeholder="service_xxxxxxx">
+      <label>Template ID</label>
+      <input class="field" id="ej_template" value="${esc(ej.template)}" placeholder="template_xxxxxxx">
+      <label>Public Key</label>
+      <input class="field" id="ej_key" value="${esc(ej.key)}" placeholder="Your EmailJS Public Key">
+      <button class="smallbtn" onclick="saveEmailSettings()">Save email settings</button>
+    </div>
+  `;
+}
+function saveEmailSettings(){
+  let s=store();
+  s.emailjs={
+    service:document.getElementById('ej_service').value.trim(),
+    template:document.getElementById('ej_template').value.trim(),
+    key:document.getElementById('ej_key').value.trim()
+  };
+  save(s); toast('Email settings saved ♡'); renderAccountTab();
+}
+function changeAccount(){
+  let a=auth();
+  let cur=document.getElementById('curPass').value;
+  if(cur!==a.pass){ toast('Current password is incorrect'); return; }
+  let newId=document.getElementById('newId').value.trim();
+  let newPass=document.getElementById('newPass').value;
+  if(!newId){ toast('Admin ID cannot be empty'); return; }
+  a.id=newId;
+  if(newPass) a.pass=newPass;
+  localStorage.setItem(AUTH_KEY,JSON.stringify(a));
+  toast('Account updated ♡');
+  renderAccountTab();
+}
+
+boot();
+</script>
+</body>
+</html>
